@@ -65,17 +65,16 @@ public class Server {
     }
 
     private void acceptClients(){
-        while(this.isRunning){
-            try{
+        try{
+            while(this.isRunning){
                 Socket clientSocket = this.socket.accept();
                 this.clientsSet.add(clientSocket);
                 System.out.println("NEW CLIENT " + clientSocket.getRemoteSocketAddress());
                 this.executor.submit(() -> handleClient(clientSocket)); 
-            }catch(IOException e){
-                if(this.isRunning){
-                    System.out.println(e.getMessage());
-                }
-                break;
+            }
+        }catch(IOException e){
+            if(this.isRunning){
+                System.out.println(e.getMessage());
             }
         }
     }
