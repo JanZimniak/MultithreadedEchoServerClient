@@ -86,10 +86,15 @@ public class Server {
         ){
             while(this.isRunning){
                 DataObject clientData = (DataObject)fromClient.readObject(); 
-                String clientMessage = clientData.getMessage();
-                DataObject echoData = DataObject.createMessage("server_echo", "ECHO "+clientMessage); 
-                writeToClient.writeObject(echoData);
-                writeToClient.flush();
+                if(DataObject.isValidRequest(clientData)){
+                    writeToClient.writeObject(DataObject.instantiateResponsePing());
+                    writeToClient.flush();
+                }else{
+                    String clientMessage = clientData.getMessage();
+                    DataObject echoData = DataObject.createMessage("server_echo", "ECHO "+clientMessage); 
+                    writeToClient.writeObject(echoData);
+                    writeToClient.flush();
+                }
             }
         }catch(IOException e){
             System.out.println("Client disconnected.");

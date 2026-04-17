@@ -33,8 +33,12 @@ public class DataObject implements Serializable{
         return new DataObject(title, message);
     }
 
-    public boolean isValidResponse(DataObject obj){
-        return (obj.title == RESPONSE && obj.message == null);
+    public static boolean isValidResponse(DataObject obj){
+        return (obj.title.equals(RESPONSE) && obj.message == null);
+    }
+
+    public static boolean isValidRequest(DataObject obj){
+        return (obj.title.equals(REQUEST) && obj.message == null);
     }
 
     public String getMessage(){
