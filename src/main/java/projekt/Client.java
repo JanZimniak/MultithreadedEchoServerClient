@@ -8,24 +8,26 @@ import java.net.Socket;
 import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 public class Client {
     private Socket socket;
+<<<<<<< HEAD
+=======
     private ExecutorService executor = Executors.newCachedThreadPool();
     private ScheduledExecutorService scheduled_executor = Executors.newSingleThreadScheduledExecutor();
+>>>>>>> 0ce6508 (Removed ping, added reconnect when server is not found)
     private InetSocketAddress endpoint;
 
     private ObjectOutputStream write;
     private ObjectInputStream read;
 
     private volatile boolean isRunning;
-    private volatile boolean isConnected;
 
     public Client() throws IOException{
         this.socket = new Socket();
         this.socket.setReuseAddress(true);
+<<<<<<< HEAD
+=======
 
         this.isRunning = true;
         this.isConnected = false;
@@ -75,22 +77,23 @@ public class Client {
             }
         }
         catch(IOException ignore){}
+>>>>>>> 0ce6508 (Removed ping, added reconnect when server is not found)
     }
 
     public void closeClient(){
         System.out.println("Closing client");
         this.isRunning = false;
-        this.isConnected = false;
         try{
             this.socket.close();
         }catch(IOException e){
             System.out.println(e.getMessage());
         }
-        this.executor.shutdownNow();
-        this.scheduled_executor.shutdownNow();
+        this.executor.shutdown();
     }
 
     private void handleSend(){
+<<<<<<< HEAD
+=======
         Scanner scanner = new Scanner(System.in);
         while(this.isRunning){
             String input = scanner.nextLine();
@@ -103,18 +106,16 @@ public class Client {
                 continue;
             }
             try{
+>>>>>>> 0ce6508 (Removed ping, added reconnect when server is not found)
                 DataObject sendData = DataObject.createMessage("client", input);
                 this.write.writeObject(sendData);
                 this.write.flush();
-            }catch(IOException e){
-                if(this.isRunning && this.isConnected){
-                    System.out.println("HANDLE_SEND: " + e.getMessage());
-                }else if(this.isRunning){
-                    System.out.println("COULDN'T SEND MESSAGE");
-                }
+            } 
+        }catch(IOException e){
+            if(this.isRunning){
+                System.out.println(e.getMessage());
             }
         }
-        scanner.close();
     }
 
     private void handleReceive(){
@@ -123,6 +124,8 @@ public class Client {
                 DataObject serverData = (DataObject)this.read.readObject();
                 System.out.println(serverData.getMessage());
             }
+<<<<<<< HEAD
+=======
         }catch(IOException | ClassNotFoundException e){
             if(!this.isRunning){
                 System.out.println("HANDLE_RECEIVE: " + e.getMessage());
@@ -130,6 +133,7 @@ public class Client {
                 this.isConnected = false;
                 reconnect();
             }
+>>>>>>> 0ce6508 (Removed ping, added reconnect when server is not found)
         }
     }
 
