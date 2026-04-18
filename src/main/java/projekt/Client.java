@@ -13,8 +13,8 @@ import java.util.concurrent.TimeUnit;
 
 public class Client {
     private Socket socket;
-    private ExecutorService executor;
-    private ScheduledExecutorService scheduled_executor;
+    private ExecutorService executor = Executors.newCachedThreadPool();
+    private ScheduledExecutorService scheduled_executor = Executors.newSingleThreadScheduledExecutor();
     private InetSocketAddress endpoint;
 
     private ObjectOutputStream write;
@@ -23,33 +23,58 @@ public class Client {
     private volatile boolean isRunning;
     private volatile boolean isConnected;
 
-    public Client(String address, int port) throws IOException{
+    public Client() throws IOException{
         this.socket = new Socket();
         this.socket.setReuseAddress(true);
-        this.socket.bind(new InetSocketAddress(address, port));
-
-        this.isRunning = false;
-        this.isConnected = false;
-
-        this.executor = Executors.newCachedThreadPool(); 
-        this.scheduled_executor = Executors.newSingleThreadScheduledExecutor();
-    }
-
-    public void connect(String endAddress, int endPort) throws IOException{
-        this.endpoint = new InetSocketAddress(endAddress, endPort); 
-        this.socket.connect(this.endpoint);
 
         this.isRunning = true;
-        this.isConnected = true;
-        
-        this.write = new ObjectOutputStream(this.socket.getOutputStream());
-        this.read = new ObjectInputStream(this.socket.getInputStream());
+        this.isConnected = false;
 
         this.executor.submit(this::handleSend);
-        this.executor.submit(this::handleReceive);
+    }
+
+    public void connect(String endAddress, int endPort){
+        try{
+            this.endpoint = new InetSocketAddress(endAddress, endPort); 
+            startConnection();
+        }catch(IOException e){
+            reconnect();
+        }
+    }
+
+    private void reconnect(){
+        connectionCleanup();
         this.scheduled_executor.scheduleAtFixedRate(()->{
-            handleConnectionCheck();
-        }, 0, 1, TimeUnit.SECONDS);
+            if(!this.isConnected && this.isRunning){
+                try{
+                    System.out.println("RECONNECTING");
+                    startConnection();
+                }catch(IOException e){
+                    System.out.println("FAILED TO RECONNECT");
+                }
+            }
+        }, 2, 2, TimeUnit.SECONDS);
+    }
+    
+    public void startConnection() throws IOException{
+        connectionCleanup();
+        this.socket = new Socket();
+        this.socket.setReuseAddress(true);  
+        this.socket.connect(this.endpoint);
+        this.write = new ObjectOutputStream(this.socket.getOutputStream());
+        this.read = new ObjectInputStream(this.socket.getInputStream());
+        this.isConnected = true;
+        this.executor.submit(this::handleReceive);
+        System.out.println("CONNECTION SUCCESSFUL");
+    }
+
+    private void connectionCleanup(){
+        try{
+            if(this.socket != null){
+                this.socket.close();
+            }
+        }
+        catch(IOException ignore){}
     }
 
     public void closeClient(){
@@ -68,12 +93,16 @@ public class Client {
     private void handleSend(){
         Scanner scanner = new Scanner(System.in);
         while(this.isRunning){
+            String input = scanner.nextLine();
+            if(input.equals("end")){
+                closeClient();
+                break;
+            }
+            if(!this.isConnected || this.write == null){
+                System.out.println("MESSAGE NOT SENT, NOT CONNECTED");
+                continue;
+            }
             try{
-                String input = scanner.nextLine();
-                if(input.equals("end")){
-                    closeClient();
-                    break;
-                }
                 DataObject sendData = DataObject.createMessage("client", input);
                 this.write.writeObject(sendData);
                 this.write.flush();
@@ -90,48 +119,22 @@ public class Client {
 
     private void handleReceive(){
         try{
-            while(this.isRunning){
+            while(this.isRunning && this.isConnected){
                 DataObject serverData = (DataObject)this.read.readObject();
-                if(DataObject.isValidResponse(serverData)){
-                    setConnected(true);
-                }else{
-                    System.out.println(serverData.getMessage());
-                }
+                System.out.println(serverData.getMessage());
             }
-        }catch(IOException e){
+        }catch(IOException | ClassNotFoundException e){
             if(!this.isRunning){
                 System.out.println("HANDLE_RECEIVE: " + e.getMessage());
-            }
-        }catch(ClassNotFoundException e){
-            System.out.println("HANDLE_RECEIVE: " + e.getMessage());
-        }
-    }
-
-    private void handleConnectionCheck(){
-        try{
-            this.write.writeObject(DataObject.instantiateRequestPing());
-            this.write.flush();
-        }catch(IOException e){
-            if(this.isRunning){
-                setConnected(false);
             }else{
-                System.out.println("HANDLE_CONNECTION_CHECK: " + e.getMessage());
+                this.isConnected = false;
+                reconnect();
             }
         }
-    }
-
-    private void setConnected(boolean value){
-        if(this.isConnected != value){
-            this.isConnected = value;
-        }
-    }
-
-    public boolean isConnected(){
-        return this.isConnected;
     }
 
     public static void main(String[] args) throws IOException {
-        Client client = new Client("localhost", 5555);
+        Client client = new Client();
         client.connect("127.0.0.1", 6666);
     }
 }
