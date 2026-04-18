@@ -1,6 +1,7 @@
 package projekt;
 
 import java.io.Serializable;
+import java.nio.charset.StandardCharsets;
 
 public class DataObject implements Serializable{
 
@@ -9,6 +10,7 @@ public class DataObject implements Serializable{
 
     private String title;
     private String message;
+    private int messageSize;
 
     private DataObject(){
         throw new AssertionError("Cannot instantiate DataObject class");
@@ -19,6 +21,7 @@ public class DataObject implements Serializable{
     private DataObject(String title, String message){
         this.title = title;
         this.message = message;
+        this.messageSize = this.message != null ? this.message.getBytes(StandardCharsets.UTF_8).length : 0;
     }
 
     public static DataObject instantiateRequestPing(){
@@ -43,5 +46,9 @@ public class DataObject implements Serializable{
 
     public String getMessage(){
         return this.message;
+    }
+
+    public int getMessageSize(){
+        return this.messageSize;
     }
 }

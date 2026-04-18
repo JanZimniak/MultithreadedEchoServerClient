@@ -91,7 +91,7 @@ public class Server {
                     writeToClient.flush();
                 }else{
                     String clientMessage = clientData.getMessage();
-                    DataObject echoData = DataObject.createMessage("server_echo", "ECHO "+clientMessage); 
+                    DataObject echoData = DataObject.createMessage("server_echo", clientMessage); 
                     writeToClient.writeObject(echoData);
                     writeToClient.flush();
                 }

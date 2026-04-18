@@ -5,6 +5,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -122,7 +123,11 @@ public class Client {
         try{
             while(this.isRunning && this.isConnected){
                 DataObject serverData = (DataObject)this.read.readObject();
-                System.out.println(serverData.getMessage());
+                String message = serverData.getMessage();
+
+                int sizeSent = serverData.getMessageSize();
+                int sizeRec = message != null ? message.getBytes(StandardCharsets.UTF_8).length : 0;
+                System.out.println(message + " [SENT: " + sizeSent + ", GOT: " + sizeRec + "]");
             }
 <<<<<<< HEAD
 =======
