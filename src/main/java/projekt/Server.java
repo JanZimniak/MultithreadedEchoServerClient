@@ -19,14 +19,18 @@ public class Server {
     private ExecutorService executor;
     private InetSocketAddress bindpoint;
 
-    private Set<Socket> clientsSet;
+    private Draw draw;
+
+    private ConcurrentHashMap<String, Socket> clientsMap;
 
     public Server(int port) throws IOException{
         this.socket = new ServerSocket();
         this.bindpoint = new InetSocketAddress(port);
         this.isRunning = false;
         this.executor = Executors.newCachedThreadPool(); 
-        this.clientsSet = ConcurrentHashMap.newKeySet();
+        this.clientsMap = new ConcurrentHashMap<>();
+        this.draw = new Draw();
+        setupDraw();
     }
 
     public void start() throws IOException{
@@ -35,11 +39,16 @@ public class Server {
         this.executor.submit(()->{
             getUserInput();
         });
+        this.draw.redraw();
         acceptClients();
     }
 
+    private void setupDraw(){
+        this.draw.addConstMessage("Server.");
+        this.draw.addConstMessage("Press <ENTER> to stop server.");
+    }
+
     private void getUserInput(){
-        System.out.println("Press <ENTER> to stop server");
         Scanner sc = new Scanner(System.in);
         sc.nextLine();
         sc.close();
@@ -47,7 +56,6 @@ public class Server {
     }
 
     private void closeServer(){
-        System.out.println("Closing server");
         this.isRunning = false;
 
         try{
@@ -56,11 +64,11 @@ public class Server {
             System.out.println(e.getMessage());
         }
 
-        for(Socket client : this.clientsSet){
+        this.clientsMap.forEach((clientAddress, clientSocket) -> {
             try{
-                client.close();
+                clientSocket.close();
             }catch(IOException ignore){}
-        }
+        });
         this.executor.shutdown();
     }
 
@@ -68,8 +76,9 @@ public class Server {
         try{
             while(this.isRunning){
                 Socket clientSocket = this.socket.accept();
-                this.clientsSet.add(clientSocket);
-                System.out.println("NEW CLIENT " + clientSocket.getRemoteSocketAddress());
+                this.clientsMap.put(clientSocket.getInetAddress().toString(), clientSocket);
+                this.draw.addConstMessage(clientSocket.getInetAddress().toString());
+                this.draw.redraw();
                 this.executor.submit(() -> handleClient(clientSocket)); 
             }
         }catch(IOException e){
@@ -90,9 +99,7 @@ public class Server {
                     writeToClient.writeObject(DataObject.instantiateResponsePing());
                     writeToClient.flush();
                 }else{
-                    String clientMessage = clientData.getMessage();
-                    DataObject echoData = DataObject.createMessage("server_echo", clientMessage); 
-                    writeToClient.writeObject(echoData);
+                    writeToClient.writeObject(clientData);
                     writeToClient.flush();
                 }
             }
@@ -101,10 +108,11 @@ public class Server {
         }catch(ClassNotFoundException e){
             System.out.println(e.getMessage());
         }finally{
-            this.clientsSet.remove(client);
+            this.clientsMap.remove(client.getInetAddress().toString());
             try{
                 client.close();
             }catch(IOException ignore){}
+            this.draw.redraw();
         }
     }
     
