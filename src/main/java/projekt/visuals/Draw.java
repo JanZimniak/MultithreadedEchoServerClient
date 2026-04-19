@@ -16,11 +16,9 @@ public class Draw {
             System.out.println(msg);
         }
 
-        int counter = 0;
-        for(String msg : this.scrolledData){
-            if(counter >= MAX_SCROLL) break;
+        int start = (this.scrolledData.size() - 10 > 0) ? this.scrolledData.size()-10 : 0;
+        for(String msg : this.scrolledData.subList(start, this.scrolledData.size())){
             System.out.println(msg);
-            counter++;
         }
 
     }
@@ -36,6 +34,7 @@ public class Draw {
     }
     public void addScrolledData(String message){
         this.scrolledData.add(message);
+        this.redraw();
     }
     public void removeConstMessage(String message){
         this.constData.remove(message);

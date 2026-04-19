@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.Executors;
 
 import projekt.enums.ConnectionState;
+import projekt.visuals.Draw;
 
 public class Client {
     private Socket socket;
@@ -29,12 +30,15 @@ public class Client {
 
     private volatile ConnectionState state;
 
+    private Draw draw = new Draw();
+
     public Client() throws IOException{
         this.socket = new Socket();
         this.socket.setReuseAddress(true);
+        setupDraw();
+        setState(ConnectionState.RUNNING);
 
-        this.state = ConnectionState.RUNNING;
-
+        this.draw.redraw();
         this.executor.submit(this::handleSend);
     }
 
@@ -47,6 +51,27 @@ public class Client {
         }
     }
 
+    private void setupDraw(){
+        String serverHuge ="""
+          _____   __   _              __ 
+         / ___/  / /  (_) ___   ___  / /_
+        / /__   / /  / / / -_) / _ \\/ __/
+        \\___/  /_/  /_/  \\__/ /_//_/\\__/ """;
+
+
+        this.draw.addConstMessage(serverHuge);
+        this.draw.addConstMessage("Type 'end' to stop conversation.");
+        this.draw.addConstMessage("Status: ");
+        this.draw.addConstMessage(ConnectionState.OFFLINE.getState());
+    }
+
+    private void setState(ConnectionState state){
+        this.state = state;
+        this.draw.popConstMessage();
+        this.draw.addConstMessage(this.state.getState());
+        this.draw.redraw();
+    }
+
     private void reconnect(){
         connectionCleanup();
         if(this.scheduledTask != null){
@@ -56,13 +81,12 @@ public class Client {
         this.scheduledTask = this.scheduled_executor.scheduleAtFixedRate(()->{
             if(this.state != ConnectionState.OFFLINE){
                 try{
-                    System.out.println("RECONNECTING");
                     startConnection();
                     this.scheduledTask.cancel(false);
                 }catch(ConnectException e){
-                    System.out.println("FAILED TO RECONNECT");
+                    setState(ConnectionState.RUNNING);
                 }catch(IOException e){
-                    System.out.println("SERVER BUSY");
+                    setState(ConnectionState.SERVER_BUSY);
                 }
             }
         }, 2, 2, TimeUnit.SECONDS);
@@ -75,9 +99,8 @@ public class Client {
         this.socket.connect(this.endpoint);
         this.write = new ObjectOutputStream(this.socket.getOutputStream());
         this.read = new ObjectInputStream(this.socket.getInputStream());
-        this.state = ConnectionState.CONNECTED;
+        setState(ConnectionState.CONNECTED);
         this.executor.submit(this::handleReceive);
-        System.out.println("CONNECTION SUCCESSFUL");
     }
 
     private void connectionCleanup(){
@@ -90,8 +113,7 @@ public class Client {
     }
 
     public void closeClient(){
-        System.out.println("Closing client");
-        this.state = ConnectionState.OFFLINE;
+        setState(ConnectionState.OFFLINE);
         try{
             this.socket.close();
         }catch(IOException e){
@@ -109,8 +131,9 @@ public class Client {
                 closeClient();
                 break;
             }
+            this.draw.addScrolledData(input);
             if( this.state != ConnectionState.CONNECTED || this.write == null){
-                System.out.println("MESSAGE NOT SENT, NOT CONNECTED");
+                this.draw.addScrolledData("#: MESSAGE NOT SENT, NOT CONNECTED");
                 continue;
             }
             try{
@@ -134,7 +157,8 @@ public class Client {
 
                 int sizeSent = serverData.getMessageSize();
                 int sizeRec = message != null ? message.getBytes(StandardCharsets.UTF_8).length : 0;
-                System.out.println(message + " [SENT: " + sizeSent + ", GOT: " + sizeRec + "]");
+                String showMessage = message + " [SENT: " + sizeSent + ", GOT: " + sizeRec + "]";
+                this.draw.addScrolledData(showMessage);
             }
         }catch(IOException | ClassNotFoundException e){
             if(this.state != ConnectionState.OFFLINE){
