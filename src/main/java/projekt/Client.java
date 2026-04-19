@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.Executors;
 
@@ -16,6 +17,8 @@ public class Client {
     private Socket socket;
     private ExecutorService executor = Executors.newCachedThreadPool();
     private ScheduledExecutorService scheduled_executor = Executors.newSingleThreadScheduledExecutor();
+    private ScheduledFuture<?> scheduledTask;
+
     private InetSocketAddress endpoint;
 
     private ObjectOutputStream write;
@@ -45,11 +48,16 @@ public class Client {
 
     private void reconnect(){
         connectionCleanup();
-        this.scheduled_executor.scheduleAtFixedRate(()->{
+        if(this.scheduledTask != null){
+            this.scheduledTask.cancel(false);
+            this.scheduledTask = null;
+        }
+        this.scheduledTask = this.scheduled_executor.scheduleAtFixedRate(()->{
             if(!this.isConnected && this.isRunning){
                 try{
                     System.out.println("RECONNECTING");
                     startConnection();
+                    this.scheduledTask.cancel(false);
                 }catch(IOException e){
                     System.out.println("FAILED TO RECONNECT");
                 }
@@ -81,12 +89,14 @@ public class Client {
     public void closeClient(){
         System.out.println("Closing client");
         this.isRunning = false;
+        this.isConnected = false;
         try{
             this.socket.close();
         }catch(IOException e){
             System.out.println(e.getMessage());
         }
         this.executor.shutdown();
+        this.scheduled_executor.shutdown();
     }
 
     private void handleSend(){
@@ -125,9 +135,7 @@ public class Client {
                 System.out.println(message + " [SENT: " + sizeSent + ", GOT: " + sizeRec + "]");
             }
         }catch(IOException | ClassNotFoundException e){
-            if(!this.isRunning){
-                System.out.println("HANDLE_RECEIVE: " + e.getMessage());
-            }else{
+            if(this.isRunning){
                 this.isConnected = false;
                 reconnect();
             }
