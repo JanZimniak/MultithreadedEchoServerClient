@@ -7,28 +7,25 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Scanner;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 
 public class Server {
 
     private ServerSocket socket;
     private volatile boolean isRunning;
-    private ExecutorService executor;
+    private ExecutorService executor = Executors.newCachedThreadPool(); 
     private InetSocketAddress bindpoint;
-
     private Draw draw;
-
-    private ConcurrentHashMap<String, Socket> clientsMap;
+    private ConcurrentHashMap<String, Socket> clientsMap = new ConcurrentHashMap<>();
+    private Semaphore semaphore = new Semaphore(2);
 
     public Server(int port) throws IOException{
         this.socket = new ServerSocket();
         this.bindpoint = new InetSocketAddress(port);
         this.isRunning = false;
-        this.executor = Executors.newCachedThreadPool(); 
-        this.clientsMap = new ConcurrentHashMap<>();
         this.draw = new Draw();
         setupDraw();
     }
@@ -85,6 +82,10 @@ public class Server {
         try{
             while(this.isRunning){
                 Socket clientSocket = this.socket.accept();
+                if(!this.semaphore.tryAcquire()){
+                    clientSocket.close();
+                    continue;
+                }
                 this.clientsMap.put(getClientIdentifier(clientSocket), clientSocket);
                 this.draw.addConstMessage(getClientIdentifier(clientSocket));
                 this.draw.redraw();
@@ -121,6 +122,8 @@ public class Server {
             this.draw.redraw();
         }catch(ClassNotFoundException e){
             System.out.println(e.getMessage());
+        }finally{
+            this.semaphore.release();
         }
     }
 

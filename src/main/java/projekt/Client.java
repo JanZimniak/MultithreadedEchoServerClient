@@ -3,6 +3,7 @@ package projekt;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
@@ -58,8 +59,10 @@ public class Client {
                     System.out.println("RECONNECTING");
                     startConnection();
                     this.scheduledTask.cancel(false);
-                }catch(IOException e){
+                }catch(ConnectException e){
                     System.out.println("FAILED TO RECONNECT");
+                }catch(IOException e){
+                    System.out.println("SERVER BUSY");
                 }
             }
         }, 2, 2, TimeUnit.SECONDS);
