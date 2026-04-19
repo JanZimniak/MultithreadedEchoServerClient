@@ -44,8 +44,16 @@ public class Server {
     }
 
     private void setupDraw(){
-        this.draw.addConstMessage("Server.");
+        String serverHuge ="""
+           ____                            
+          / __/ ___   ____ _  __ ___   ____
+         _\\ \\  / -_) / __/| |/ // -_) / __/
+        /___/  \\__/ /_/   |___/ \\__/ /_/   """;
+
+
+        this.draw.addConstMessage(serverHuge);
         this.draw.addConstMessage("Press <ENTER> to stop server.");
+        this.draw.addConstMessage("Connected clients:");
     }
 
     private void getUserInput(){
@@ -64,20 +72,21 @@ public class Server {
             System.out.println(e.getMessage());
         }
 
-        this.clientsMap.forEach((clientAddress, clientSocket) -> {
+        this.clientsMap.forEach((k, clientSocket) -> {
             try{
                 clientSocket.close();
             }catch(IOException ignore){}
         });
-        this.executor.shutdown();
+        
+        this.executor.shutdownNow();
     }
 
     private void acceptClients(){
         try{
             while(this.isRunning){
                 Socket clientSocket = this.socket.accept();
-                this.clientsMap.put(clientSocket.getInetAddress().toString(), clientSocket);
-                this.draw.addConstMessage(clientSocket.getInetAddress().toString());
+                this.clientsMap.put(getClientIdentifier(clientSocket), clientSocket);
+                this.draw.addConstMessage(getClientIdentifier(clientSocket));
                 this.draw.redraw();
                 this.executor.submit(() -> handleClient(clientSocket)); 
             }
@@ -104,16 +113,19 @@ public class Server {
                 }
             }
         }catch(IOException e){
-            System.out.println("Client disconnected.");
-        }catch(ClassNotFoundException e){
-            System.out.println(e.getMessage());
-        }finally{
-            this.clientsMap.remove(client.getInetAddress().toString());
+            this.clientsMap.remove(getClientIdentifier(client));
+            this.draw.removeConstMessage(getClientIdentifier(client));
             try{
                 client.close();
             }catch(IOException ignore){}
             this.draw.redraw();
+        }catch(ClassNotFoundException e){
+            System.out.println(e.getMessage());
         }
+    }
+
+    private String getClientIdentifier(Socket client){
+        return client.getInetAddress().toString() + ":" + String.valueOf(client.getPort());
     }
     
     public static void main(String[] args) throws IOException {

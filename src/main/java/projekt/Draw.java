@@ -37,4 +37,7 @@ public class Draw {
     public void addScrolledData(String message){
         this.scrolledData.add(message);
     }
+    public void removeConstMessage(String message){
+        this.constData.remove(message);
+    }
 }
