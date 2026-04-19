@@ -31,6 +31,7 @@ public class Client {
     private volatile ConnectionState state;
 
     private Draw draw = new Draw();
+    private final Object drawLock = new Object();
 
     public Client() throws IOException{
         this.socket = new Socket();
@@ -38,7 +39,9 @@ public class Client {
         setupDraw();
         setState(ConnectionState.RUNNING);
 
-        this.draw.redraw();
+        synchronized(this.drawLock){
+            this.draw.redraw();
+        }
         this.executor.submit(this::handleSend);
     }
 
@@ -59,20 +62,24 @@ public class Client {
         \\___/  /_/  /_/  \\__/ /_//_/\\__/ """;
 
 
-        this.draw.addConstMessage(serverHuge);
-        this.draw.addConstMessage("Type 'end' to stop conversation.");
-        this.draw.addConstMessage("Status: ");
-        this.draw.addConstMessage(ConnectionState.OFFLINE.getState());
+        synchronized(this.drawLock){
+            this.draw.addConstMessage(serverHuge);
+            this.draw.addConstMessage("Type 'end' to stop conversation.");
+            this.draw.addConstMessage("Status: ");
+            this.draw.addConstMessage(ConnectionState.OFFLINE.getState());
+        }
     }
 
-    private void setState(ConnectionState state){
+    private synchronized void setState(ConnectionState state){
         this.state = state;
-        this.draw.popConstMessage();
-        this.draw.addConstMessage(this.state.getState());
-        this.draw.redraw();
+        synchronized(this.drawLock){
+            this.draw.popConstMessage();
+            this.draw.addConstMessage(this.state.getState());
+            this.draw.redraw();
+        }
     }
 
-    private void reconnect(){
+    private synchronized void reconnect(){
         connectionCleanup();
         if(this.scheduledTask != null){
             this.scheduledTask.cancel(false);
@@ -92,7 +99,7 @@ public class Client {
         }, 2, 2, TimeUnit.SECONDS);
     }
     
-    public void startConnection() throws IOException{
+    public synchronized void startConnection() throws IOException{
         connectionCleanup();
         this.socket = new Socket();
         this.socket.setReuseAddress(true);  
@@ -103,7 +110,7 @@ public class Client {
         this.executor.submit(this::handleReceive);
     }
 
-    private void connectionCleanup(){
+    private synchronized void connectionCleanup(){
         try{
             if(this.socket != null){
                 this.socket.close();
@@ -112,8 +119,12 @@ public class Client {
         catch(IOException ignore){}
     }
 
-    public void closeClient(){
+    public synchronized void closeClient(){
         setState(ConnectionState.OFFLINE);
+        if(this.scheduledTask != null){
+            this.scheduledTask.cancel(false);
+            this.scheduledTask = null;
+        }
         try{
             this.socket.close();
         }catch(IOException e){
@@ -131,18 +142,27 @@ public class Client {
                 closeClient();
                 break;
             }
-            this.draw.addScrolledData(input);
-            if( this.state != ConnectionState.CONNECTED || this.write == null){
-                this.draw.addScrolledData("#: MESSAGE NOT SENT, NOT CONNECTED");
-                continue;
+            synchronized(this.drawLock){
+                this.draw.addScrolledData(input);
             }
-            try{
-                DataObject sendData = DataObject.createMessage("client", input);
-                this.write.writeObject(sendData);
-                this.write.flush();
-            }catch(IOException e){
-                if(this.state != ConnectionState.OFFLINE){
-                    System.out.println(e.getMessage());
+            boolean isSent = false;
+            synchronized(this){
+                if(this.state == ConnectionState.CONNECTED && this.write != null){
+                    try{
+                        DataObject sendData = DataObject.createMessage("client", input);
+                        this.write.writeObject(sendData);
+                        this.write.flush();
+                        isSent = true;
+                    }catch(IOException e){
+                        if(this.state != ConnectionState.OFFLINE){
+                            System.out.println(e.getMessage());
+                        }
+                    }
+                }
+            }
+            if(!isSent){
+                synchronized(this.drawLock){
+                    this.draw.addScrolledData("#: MESSAGE NOT SENT, NOT CONNECTED");
                 }
             }
         }
@@ -158,10 +178,13 @@ public class Client {
                 int sizeSent = serverData.getMessageSize();
                 int sizeRec = message != null ? message.getBytes(StandardCharsets.UTF_8).length : 0;
                 String showMessage = message + " [SENT: " + sizeSent + ", GOT: " + sizeRec + "]";
-                this.draw.addScrolledData(showMessage);
+                synchronized(this.drawLock){
+                    this.draw.addScrolledData(showMessage);
+                }
             }
         }catch(IOException | ClassNotFoundException e){
             if(this.state != ConnectionState.OFFLINE){
+                setState(ConnectionState.RUNNING);
                 reconnect();
             }
         }

@@ -17,13 +17,16 @@ import projekt.enums.ConnectionState;
 
 public class Server {
 
+    private final int MAX_CLIENT_COUNT = 2;
+
     private ServerSocket socket;
     private volatile ConnectionState state;
     private ExecutorService executor = Executors.newCachedThreadPool(); 
     private InetSocketAddress bindpoint;
     private Draw draw;
+    private final Object drawLock = new Object();
     private ConcurrentHashMap<String, Socket> clientsMap = new ConcurrentHashMap<>();
-    private Semaphore semaphore = new Semaphore(2);
+    private Semaphore semaphore = new Semaphore(MAX_CLIENT_COUNT);
 
     public Server(int port) throws IOException{
         this.socket = new ServerSocket();
@@ -39,7 +42,9 @@ public class Server {
         this.executor.submit(()->{
             getUserInput();
         });
-        this.draw.redraw();
+        synchronized(this.drawLock){
+            this.draw.redraw();
+        }
         acceptClients();
     }
 
@@ -51,9 +56,11 @@ public class Server {
         /___/  \\__/ /_/   |___/ \\__/ /_/   """;
 
 
-        this.draw.addConstMessage(serverHuge);
-        this.draw.addConstMessage("Press <ENTER> to stop server.");
-        this.draw.addConstMessage("Connected clients:");
+        synchronized(this.drawLock){
+            this.draw.addConstMessage(serverHuge);
+            this.draw.addConstMessage("Press <ENTER> to stop server.");
+            this.draw.addConstMessage("Connected clients:");
+        }
     }
 
     private void getUserInput(){
@@ -90,8 +97,10 @@ public class Server {
                     continue;
                 }
                 this.clientsMap.put(getClientIdentifier(clientSocket), clientSocket);
-                this.draw.addConstMessage(getClientIdentifier(clientSocket));
-                this.draw.redraw();
+                synchronized(this.drawLock){
+                    this.draw.addConstMessage(getClientIdentifier(clientSocket));
+                    this.draw.redraw();
+                }
                 this.executor.submit(() -> handleClient(clientSocket)); 
             }
         }catch(IOException e){
@@ -118,11 +127,13 @@ public class Server {
             }
         }catch(IOException e){
             this.clientsMap.remove(getClientIdentifier(client));
-            this.draw.removeConstMessage(getClientIdentifier(client));
+            synchronized(this.drawLock){
+                this.draw.removeConstMessage(getClientIdentifier(client));
+                this.draw.redraw();
+            }
             try{
                 client.close();
             }catch(IOException ignore){}
-            this.draw.redraw();
         }catch(ClassNotFoundException e){
             System.out.println(e.getMessage());
         }finally{
