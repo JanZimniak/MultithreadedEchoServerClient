@@ -14,6 +14,8 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.Executors;
 
+import projekt.enums.ConnectionState;
+
 public class Client {
     private Socket socket;
     private ExecutorService executor = Executors.newCachedThreadPool();
@@ -25,15 +27,13 @@ public class Client {
     private ObjectOutputStream write;
     private ObjectInputStream read;
 
-    private volatile boolean isRunning;
-    private volatile boolean isConnected;
+    private volatile ConnectionState state;
 
     public Client() throws IOException{
         this.socket = new Socket();
         this.socket.setReuseAddress(true);
 
-        this.isRunning = true;
-        this.isConnected = false;
+        this.state = ConnectionState.RUNNING;
 
         this.executor.submit(this::handleSend);
     }
@@ -54,7 +54,7 @@ public class Client {
             this.scheduledTask = null;
         }
         this.scheduledTask = this.scheduled_executor.scheduleAtFixedRate(()->{
-            if(!this.isConnected && this.isRunning){
+            if(this.state != ConnectionState.OFFLINE){
                 try{
                     System.out.println("RECONNECTING");
                     startConnection();
@@ -75,7 +75,7 @@ public class Client {
         this.socket.connect(this.endpoint);
         this.write = new ObjectOutputStream(this.socket.getOutputStream());
         this.read = new ObjectInputStream(this.socket.getInputStream());
-        this.isConnected = true;
+        this.state = ConnectionState.CONNECTED;
         this.executor.submit(this::handleReceive);
         System.out.println("CONNECTION SUCCESSFUL");
     }
@@ -91,8 +91,7 @@ public class Client {
 
     public void closeClient(){
         System.out.println("Closing client");
-        this.isRunning = false;
-        this.isConnected = false;
+        this.state = ConnectionState.OFFLINE;
         try{
             this.socket.close();
         }catch(IOException e){
@@ -104,13 +103,13 @@ public class Client {
 
     private void handleSend(){
         Scanner scanner = new Scanner(System.in);
-        while(this.isRunning){
+        while(this.state != ConnectionState.OFFLINE){
             String input = scanner.nextLine();
             if(input.equals("end")){
                 closeClient();
                 break;
             }
-            if(!this.isConnected || this.write == null){
+            if( this.state != ConnectionState.CONNECTED || this.write == null){
                 System.out.println("MESSAGE NOT SENT, NOT CONNECTED");
                 continue;
             }
@@ -119,7 +118,7 @@ public class Client {
                 this.write.writeObject(sendData);
                 this.write.flush();
             }catch(IOException e){
-                if(this.isRunning){
+                if(this.state != ConnectionState.OFFLINE){
                     System.out.println(e.getMessage());
                 }
             }
@@ -129,7 +128,7 @@ public class Client {
 
     private void handleReceive(){
         try{
-            while(this.isRunning && this.isConnected){
+            while(this.state == ConnectionState.CONNECTED){
                 DataObject serverData = (DataObject)this.read.readObject();
                 String message = serverData.getMessage();
 
@@ -138,8 +137,7 @@ public class Client {
                 System.out.println(message + " [SENT: " + sizeSent + ", GOT: " + sizeRec + "]");
             }
         }catch(IOException | ClassNotFoundException e){
-            if(this.isRunning){
-                this.isConnected = false;
+            if(this.state != ConnectionState.OFFLINE){
                 reconnect();
             }
         }

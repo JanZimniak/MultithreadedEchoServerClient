@@ -1,4 +1,4 @@
-package projekt;
+package projekt.visuals;
 
 import java.util.ArrayList;
 
@@ -39,5 +39,8 @@ public class Draw {
     }
     public void removeConstMessage(String message){
         this.constData.remove(message);
+    }
+    public void popConstMessage(){
+        this.constData.remove(this.constData.size() - 1);
     }
 }

@@ -12,10 +12,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 
+import projekt.visuals.Draw;
+import projekt.enums.ConnectionState;
+
 public class Server {
 
     private ServerSocket socket;
-    private volatile boolean isRunning;
+    private volatile ConnectionState state;
     private ExecutorService executor = Executors.newCachedThreadPool(); 
     private InetSocketAddress bindpoint;
     private Draw draw;
@@ -25,14 +28,14 @@ public class Server {
     public Server(int port) throws IOException{
         this.socket = new ServerSocket();
         this.bindpoint = new InetSocketAddress(port);
-        this.isRunning = false;
+        this.state = ConnectionState.OFFLINE;
         this.draw = new Draw();
         setupDraw();
     }
 
     public void start() throws IOException{
         this.socket.bind(this.bindpoint);
-        this.isRunning = true;
+        this.state = ConnectionState.RUNNING;
         this.executor.submit(()->{
             getUserInput();
         });
@@ -61,7 +64,7 @@ public class Server {
     }
 
     private void closeServer(){
-        this.isRunning = false;
+        this.state = ConnectionState.OFFLINE;
 
         try{
             this.socket.close();
@@ -80,7 +83,7 @@ public class Server {
 
     private void acceptClients(){
         try{
-            while(this.isRunning){
+            while(this.state == ConnectionState.RUNNING){
                 Socket clientSocket = this.socket.accept();
                 if(!this.semaphore.tryAcquire()){
                     clientSocket.close();
@@ -92,7 +95,7 @@ public class Server {
                 this.executor.submit(() -> handleClient(clientSocket)); 
             }
         }catch(IOException e){
-            if(this.isRunning){
+            if(this.state == ConnectionState.RUNNING){
                 System.out.println(e.getMessage());
             }
         }
@@ -103,7 +106,7 @@ public class Server {
             ObjectOutputStream writeToClient = new ObjectOutputStream(client.getOutputStream());
             ObjectInputStream fromClient = new ObjectInputStream(client.getInputStream());
         ){
-            while(this.isRunning){
+            while(this.state == ConnectionState.RUNNING){
                 DataObject clientData = (DataObject)fromClient.readObject(); 
                 if(DataObject.isValidRequest(clientData)){
                     writeToClient.writeObject(DataObject.instantiateResponsePing());
