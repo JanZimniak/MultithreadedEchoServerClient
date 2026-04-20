@@ -4,7 +4,7 @@
   <groupId>projekt</groupId>
   <artifactId>ProgramowanieSieciowe</artifactId>
   <packaging>jar</packaging>
-  <version>1.0-SNAPSHOT</version>
+  <version>1.0</version>
   <name>ProgramowanieSieciowe</name>
   <url>http://maven.apache.org</url>
 
