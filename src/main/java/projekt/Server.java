@@ -146,7 +146,11 @@ public class Server {
     }
     
     public static void main(String[] args) throws IOException {
-        Server server = new Server(6666);
-        server.start();
+        if(args.length != 1){
+            System.out.println("Wrong number of arguments: <port>");
+        }else{
+            Server server = new Server(Integer.valueOf(args[0]));
+            server.start();
+        }
     }
 }

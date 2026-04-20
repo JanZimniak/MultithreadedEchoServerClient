@@ -192,6 +192,11 @@ public class Client {
 
     public static void main(String[] args) throws IOException {
         Client client = new Client();
-        client.connect("127.0.0.1", 6666);
+        
+        if(args.length != 2){
+            System.out.println("Wrong number of arguments: <ip_address> <port>");
+        }else{
+            client.connect(args[0], Integer.valueOf(args[1]));
+        }
     }
 }
